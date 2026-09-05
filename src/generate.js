@@ -71,13 +71,11 @@ export async function generate(options) {
   log("[6/8] Combining service and GeoIP routes");
   const combinedCidrs = collapseIpv4Cidrs([...serviceCidrs, ...geoipCidrs]);
 
-  log("[7/8] Building AmneziaVPN full and mobile configurations");
-  const amneziaFullCidrs = combinedCidrs;
-  const amneziaLiteCidrs = buildLiteCidrs(sortedServiceIps, geoipCidrs, manualCidrs, excludedCidrs);
-  log(`      Full: ${amneziaFullCidrs.length} routes; mobile lite: ${amneziaLiteCidrs.length} routes`);
-  if (amneziaLiteCidrs.length > options.liteRouteWarning) {
-    log(`      WARNING: lite config exceeds the ${options.liteRouteWarning}-route mobile guideline`);
-  }
+  log("[7/8] Building GeoIP-only AmneziaVPN configurations");
+  const amneziaFullCidrs = geoipCidrs;
+  const amneziaLiteCidrs = selectLargestCidrs(geoipCidrs, options.liteRouteLimit);
+  const liteCoverage = calculateAddressCoverage(amneziaLiteCidrs, geoipCidrs);
+  log(`      Full: ${amneziaFullCidrs.length} routes; mobile lite: ${amneziaLiteCidrs.length} routes (${formatPercent(liteCoverage)} of GeoIP address space)`);
 
   log(`[8/8] Writing route lists and AmneziaVPN configurations`);
   await mkdir(options.outputDirectory, { recursive: true });
@@ -98,6 +96,7 @@ export async function generate(options) {
     combinedCidrs: combinedCidrs.length,
     amneziaFullRoutes: amneziaFullCidrs.length,
     amneziaLiteRoutes: amneziaLiteCidrs.length,
+    amneziaLiteCoverage: liteCoverage,
   };
 }
 
@@ -151,36 +150,34 @@ function isExcludedDomain(domain, exclusions) {
   return false;
 }
 
-function buildLiteCidrs(serviceIps, geoipCidrs, manualCidrs, exclusions) {
-  const geoipRanges = geoipCidrs
-    .map((cidr) => ({ ...parseCidr(cidr), cidr }))
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-
-  const candidates = serviceIps.map((ip) => {
-    const value = ipv4ToInt(ip);
-    const covering = findCoveringRange(value, geoipRanges);
-    return covering?.cidr ?? `${ip}/32`;
-  });
-
-  return subtractIpv4Cidrs([...candidates, ...manualCidrs], exclusions);
-}
-
-function findCoveringRange(value, ranges) {
-  let low = 0;
-  let high = ranges.length - 1;
-  let candidate = null;
-
-  while (low <= high) {
-    const middle = Math.floor((low + high) / 2);
-    if (ranges[middle].start <= value) {
-      candidate = ranges[middle];
-      low = middle + 1;
-    } else {
-      high = middle - 1;
-    }
+function selectLargestCidrs(cidrs, limit) {
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error(`Amnezia lite route limit must be a positive integer, got: ${limit}`);
   }
 
-  return candidate && value <= candidate.end ? candidate : null;
+  return cidrs
+    .map((cidr) => ({ cidr, ...parseCidr(cidr) }))
+    .sort((a, b) => (b.end - b.start) - (a.end - a.start) || a.start - b.start)
+    .slice(0, limit)
+    .sort((a, b) => a.start - b.start || a.end - b.end)
+    .map(({ cidr }) => cidr);
+}
+
+function calculateAddressCoverage(selectedCidrs, allCidrs) {
+  const selectedAddresses = countCidrAddresses(selectedCidrs);
+  const allAddresses = countCidrAddresses(allCidrs);
+  return allAddresses === 0 ? 1 : selectedAddresses / allAddresses;
+}
+
+function countCidrAddresses(cidrs) {
+  return cidrs.reduce((total, cidr) => {
+    const { start, end } = parseCidr(cidr);
+    return total + end - start + 1;
+  }, 0);
+}
+
+function formatPercent(value) {
+  return `${(value * 100).toFixed(1)}%`;
 }
 
 function toAmneziaJson(cidrs) {
@@ -260,7 +257,7 @@ function parseArguments(argv) {
     dnsServers: (values.get("dns-servers") ?? envServers).split(",").map((value) => value.trim()).filter(Boolean),
     concurrency: Number(values.get("concurrency") ?? process.env.DNS_CONCURRENCY ?? 40),
     minSuccessRate: Number(values.get("min-success-rate") ?? process.env.MIN_SUCCESS_RATE ?? 0.2),
-    liteRouteWarning: Number(values.get("lite-route-warning") ?? process.env.LITE_ROUTE_WARNING ?? 1000),
+    liteRouteLimit: Number(values.get("lite-route-limit") ?? process.env.AMNEZIA_LITE_ROUTE_LIMIT ?? 1000),
   };
 }
 
@@ -274,4 +271,4 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   }
 }
 
-export { buildLiteCidrs, parseArguments, toAmneziaJson };
+export { parseArguments, selectLargestCidrs, toAmneziaJson };

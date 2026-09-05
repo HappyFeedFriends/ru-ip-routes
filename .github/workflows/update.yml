@@ -27,7 +27,7 @@ jobs:
       DNS_SERVERS: system,77.88.8.8,77.88.8.1,1.1.1.1
       DNS_CONCURRENCY: "40"
       MIN_SUCCESS_RATE: "0.20"
-      LITE_ROUTE_WARNING: "1000"
+      AMNEZIA_LITE_ROUTE_LIMIT: "1000"
 
     steps:
       - name: Check out this repository
@@ -71,7 +71,7 @@ jobs:
           geoip_count=$(wc -l < output/ru-geoip-cidr.txt | tr -d ' ')
           combined_count=$(wc -l < output/ru-combined-cidr.txt | tr -d ' ')
           lite_count=$(grep -c '"hostname"' output/amnezia-lite.json || true)
-          notes="Automatically generated from v2fly/domain-list-community and v2fly/geoip. Services: ${service_count} CIDRs; GeoIP: ${geoip_count} CIDRs; combined: ${combined_count} CIDRs; mobile lite: ${lite_count} routes."
+          notes="Automatically generated from v2fly/domain-list-community and v2fly/geoip. Services: ${service_count} CIDRs; GeoIP: ${geoip_count} CIDRs; combined: ${combined_count} CIDRs; Amnezia configs use GeoIP only; mobile lite: ${lite_count} largest GeoIP routes."
           gh release delete latest --cleanup-tag --yes || true
           gh release create latest \
             output/ru-services-ipv4.txt \
