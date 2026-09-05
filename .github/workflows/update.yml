@@ -1,0 +1,85 @@
+name: Update RU IP routes
+
+on:
+  schedule:
+    - cron: "23 */8 * * *"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/update.yml"
+      - "config/**"
+      - "src/**"
+      - "package.json"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-ru-ip-routes
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DNS_SERVERS: system,77.88.8.8,77.88.8.1,1.1.1.1
+      DNS_CONCURRENCY: "40"
+      MIN_SUCCESS_RATE: "0.20"
+      LITE_ROUTE_WARNING: "1000"
+
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Generate route lists
+        run: npm run generate
+
+      - name: Detect actual output changes
+        id: changes
+        shell: bash
+        run: |
+          if [[ -n "$(git status --porcelain -- output/ru-services-ipv4.txt output/ru-services-cidr.txt output/ru-geoip-cidr.txt output/ru-combined-cidr.txt output/amnezia-full.json output/amnezia-lite.json)" ]]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "The generated lists are unchanged; nothing will be published."
+          fi
+
+      - name: Commit changed lists
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add output/ru-services-ipv4.txt output/ru-services-cidr.txt output/ru-geoip-cidr.txt output/ru-combined-cidr.txt output/amnezia-full.json output/amnezia-lite.json
+          git commit -m "chore: update RU IP routes"
+          git push
+
+      - name: Publish changed lists to the latest release
+        if: steps.changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          service_count=$(wc -l < output/ru-services-cidr.txt | tr -d ' ')
+          geoip_count=$(wc -l < output/ru-geoip-cidr.txt | tr -d ' ')
+          combined_count=$(wc -l < output/ru-combined-cidr.txt | tr -d ' ')
+          lite_count=$(grep -c '"hostname"' output/amnezia-lite.json || true)
+          notes="Automatically generated from v2fly/domain-list-community and v2fly/geoip. Services: ${service_count} CIDRs; GeoIP: ${geoip_count} CIDRs; combined: ${combined_count} CIDRs; mobile lite: ${lite_count} routes."
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest \
+            output/ru-services-ipv4.txt \
+            output/ru-services-cidr.txt \
+            output/ru-geoip-cidr.txt \
+            output/ru-combined-cidr.txt \
+            output/amnezia-full.json \
+            output/amnezia-lite.json \
+            --target "$(git rev-parse HEAD)" \
+            --title "Latest RU IP routes" \
+            --notes "$notes"

@@ -1,0 +1,4 @@
+# Remove a domain from service DNS lookup, or an IP/CIDR from every output:
+# domain:example.ru
+# 203.0.113.10
+# 203.0.113.0/24

@@ -1,0 +1,14 @@
+{
+  "name": "ru-ip-routes",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build separate and combined IPv4 routes from v2fly Russian services and GeoIP data",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "generate": "node src/generate.js"
+  },
+  "license": "MIT"
+}

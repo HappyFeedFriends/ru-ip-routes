@@ -1,0 +1,2 @@
+# v2fly category roots. Nested include: rules are expanded recursively.
+category-ru
