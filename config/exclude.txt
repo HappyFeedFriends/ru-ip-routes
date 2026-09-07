@@ -3,6 +3,6 @@
 # 203.0.113.10
 # 203.0.113.0/24
 
-# chatgpt
+# Shared Cloudflare networks used by ChatGPT — always through VPN
 8.6.112.0
 8.47.69.0

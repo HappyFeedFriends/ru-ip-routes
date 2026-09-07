@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      DNS_SERVERS: system,77.88.8.8,77.88.8.1,1.1.1.1
+      DNS_SERVERS: 77.88.8.8,77.88.8.1,1.1.1.1
       DNS_CONCURRENCY: "40"
       MIN_SUCCESS_RATE: "0.20"
       AMNEZIA_LITE_ROUTE_LIMIT: "1000"

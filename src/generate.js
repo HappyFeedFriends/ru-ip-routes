@@ -245,7 +245,7 @@ function parseArguments(argv) {
     values.set(key.slice(2), value);
   }
 
-  const envServers = process.env.DNS_SERVERS ?? "system,77.88.8.8,1.1.1.1";
+  const envServers = process.env.DNS_SERVERS ?? "77.88.8.8,1.1.1.1";
   return {
     dataDirectory: values.has("data") ? path.resolve(values.get("data")) : null,
     sourceUrl: values.get("source-url") ?? process.env.DOMAIN_LIST_URL ?? "https://codeload.github.com/v2fly/domain-list-community/tar.gz/refs/heads/master",
