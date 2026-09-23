@@ -59,13 +59,28 @@ export function loadDomainListFromEntries(entries) {
   return { expand };
 }
 
-export function normalizeDomain(value) {
+export function normalizeDomain(value, { allowTld = false } = {}) {
   const ascii = domainToASCII(value.trim().toLowerCase().replace(/^\*\./, ""));
-  if (!ascii || !ascii.includes(".") || ascii.length > 253) return null;
+  if (!ascii || (!allowTld && !ascii.includes(".")) || ascii.length > 253) return null;
   if (!ascii.split(".").every((label) => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))) {
     return null;
   }
   return ascii;
+}
+
+export function collapseDomains(domains) {
+  const uniqueDomains = new Set(domains);
+
+  return [...uniqueDomains]
+    .filter((domain) => {
+      let dot = domain.indexOf(".");
+      while (dot !== -1) {
+        if (uniqueDomains.has(domain.slice(dot + 1))) return false;
+        dot = domain.indexOf(".", dot + 1);
+      }
+      return true;
+    })
+    .sort((a, b) => a.localeCompare(b, "en"));
 }
 
 export function parseManualEntries(content, { allowCategories = false } = {}) {
@@ -116,7 +131,7 @@ function parseDomainRule(line) {
   }
 
   const raw = token.replace(/^(?:domain|full):/, "");
-  const value = normalizeDomain(raw);
+  const value = normalizeDomain(raw, { allowTld: true });
   if (!value) return null;
   return {
     value,

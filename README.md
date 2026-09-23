@@ -6,6 +6,7 @@ GitHub Actions запускает генерацию каждые 8 часов. 
 
 ## Готовые файлы
 
+- `output/ru-domains.txt` — домены российских сервисов; российские доменные зоны представлены одним TLD-правилом (`ru`, `su`, `xn--p1ai` и другие), а лишние поддомены удалены, если список уже содержит покрывающий их родительский домен.
 - `output/ru-services-ipv4.txt` — точные публичные IPv4 российских сервисов, найденные через DNS.
 - `output/ru-services-cidr.txt` — адреса сервисов, lossless-сжатые в CIDR, плюс ручные CIDR из `include.txt`.
 - `output/ru-geoip-cidr.txt` — IPv4-сети, классифицированные `v2fly/geoip` как российские.
@@ -16,6 +17,7 @@ GitHub Actions запускает генерацию каждые 8 часов. 
 Постоянные ссылки после публикации репозитория `HappyFeedFriends/ru-ip-routes`:
 
 ```text
+https://raw.githubusercontent.com/HappyFeedFriends/ru-ip-routes/main/output/ru-domains.txt
 https://raw.githubusercontent.com/HappyFeedFriends/ru-ip-routes/main/output/ru-services-cidr.txt
 https://raw.githubusercontent.com/HappyFeedFriends/ru-ip-routes/main/output/ru-geoip-cidr.txt
 https://raw.githubusercontent.com/HappyFeedFriends/ru-ip-routes/main/output/ru-combined-cidr.txt
@@ -28,7 +30,7 @@ https://github.com/HappyFeedFriends/ru-ip-routes/releases/download/latest/amnezi
 
 1. Генератор через HTTPS загружает архив актуальной ветки `master` v2fly и распаковывает каталог `data` в памяти — `git clone` и локальный кэш не нужны.
 2. Рекурсивно раскрывает `include:` из `category-ru`, учитывает фильтры атрибутов и `&`-аффилиации формата v2fly.
-3. Добавляет сервисные записи из `config/include.txt` и запрашивает A-записи через системный DNS, Yandex DNS и Cloudflare DNS.
+3. Добавляет сервисные записи из `config/include.txt`, формирует `ru-domains.txt` без поддоменов, уже покрытых родительскими правилами, и запрашивает A-записи через системный DNS, Yandex DNS и Cloudflare DNS.
 4. Загружает готовый `release/text/ru.txt` из `v2fly/geoip` и оставляет только IPv4.
 5. Вычитает IP/CIDR из `config/exclude.txt` из обоих источников.
 6. Сортирует и lossless-объединяет каждый набор CIDR.
@@ -101,7 +103,7 @@ AmneziaVPN поддерживает только IPv4 для IP-based split tunn
 
 ## Важные ограничения
 
-- `category-ru` содержит правила верхнего уровня `.ru` и `.рф`. DNS нельзя использовать для перечисления всех зарегистрированных доменов зоны, поэтому генератор берёт все явно перечисленные и рекурсивно подключённые домены, но игнорирует правила, состоящие только из TLD.
+- `ru-domains.txt` сохраняет одноуровневые правила российских доменных зон из `tld-ru`: например, `ru` покрывает все домены `.ru`, а `su` — все домены `.su`. Для DNS-снимка TLD не разрешаются; генератор запрашивает A-записи только явно перечисленных и рекурсивно подключённых доменов сервисов.
 - DNS — это снимок: CDN может возвращать разные адреса в зависимости от резолвера и региона. Опрос нескольких резолверов уменьшает, но не устраняет эту особенность.
 - `ru-services-cidr.txt` является DNS-снимком и может содержать зарубежные CDN-адреса российских сервисов.
 - `ru-geoip-cidr.txt` содержит сети, классифицированные базой геолокации как российские, но не гарантирует физическое местонахождение каждого сервера.

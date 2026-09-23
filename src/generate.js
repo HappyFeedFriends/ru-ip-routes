@@ -5,7 +5,7 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { loadDomainList, parseManualEntries } from "./domain-list.js";
+import { collapseDomains, loadDomainList, parseManualEntries } from "./domain-list.js";
 import { collapseIpv4Cidrs, isIpInCidrs, isPublicIpv4, ipv4ToInt, parseCidr, subtractIpv4Cidrs } from "./ipv4.js";
 import { loadRemoteDomainList, loadRemoteText } from "./source.js";
 
@@ -30,12 +30,14 @@ export async function generate(options) {
   }
 
   const excludedDomains = new Set(exclude.domains);
-  const domains = new Set([
+  const domainRules = new Set([
     ...rules.map((rule) => rule.value),
     ...include.domains,
   ].filter((domain) => !isExcludedDomain(domain, excludedDomains)));
+  const domains = new Set([...domainRules].filter((domain) => domain.includes(".")));
+  const collapsedDomains = collapseDomains(domainRules);
 
-  log(`      Collected ${domains.size} unique resolvable domain names`);
+  log(`      Collected ${domainRules.size} domain rules (${domains.size} resolvable names); collapsed to ${collapsedDomains.length} rules`);
   log(`[3/8] Resolving domains through ${options.dnsServers.length} DNS providers`);
   const resolved = await resolveDomains([...domains], options, (progress) => {
     log(`      DNS ${progress.processed}/${progress.total} (${progress.percent}%) — ${progress.resolvedDomains} domains resolved, ${progress.ips} unique IPs`);
@@ -79,6 +81,7 @@ export async function generate(options) {
 
   log(`[8/8] Writing route lists and AmneziaVPN configurations`);
   await mkdir(options.outputDirectory, { recursive: true });
+  await atomicWrite(path.join(options.outputDirectory, "ru-domains.txt"), `${collapsedDomains.join("\n")}\n`);
   await atomicWrite(path.join(options.outputDirectory, "ru-services-ipv4.txt"), `${sortedServiceIps.join("\n")}\n`);
   await atomicWrite(path.join(options.outputDirectory, "ru-services-cidr.txt"), `${serviceCidrs.join("\n")}\n`);
   await atomicWrite(path.join(options.outputDirectory, "ru-geoip-cidr.txt"), `${geoipCidrs.join("\n")}\n`);
@@ -89,6 +92,7 @@ export async function generate(options) {
 
   return {
     domains: domains.size,
+    collapsedDomains: collapsedDomains.length,
     resolvedDomains: resolved.resolvedDomains,
     serviceIps: sortedServiceIps.length,
     serviceCidrs: serviceCidrs.length,
@@ -264,7 +268,7 @@ function parseArguments(argv) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   try {
     const stats = await generate(parseArguments(process.argv.slice(2)));
-    console.log(`Processed ${stats.domains} domains; wrote ${stats.serviceIps} service IPs, ${stats.combinedCidrs} combined CIDRs, ${stats.amneziaFullRoutes} full Amnezia routes, and ${stats.amneziaLiteRoutes} mobile routes.`);
+    console.log(`Processed ${stats.domains} domains; wrote ${stats.collapsedDomains} collapsed domain rules, ${stats.serviceIps} service IPs, ${stats.combinedCidrs} combined CIDRs, ${stats.amneziaFullRoutes} full Amnezia routes, and ${stats.amneziaLiteRoutes} mobile routes.`);
   } catch (error) {
     console.error(error.stack ?? error.message);
     process.exitCode = 1;
