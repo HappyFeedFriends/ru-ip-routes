@@ -340,6 +340,8 @@ kontur-inc.com
 kontur.host
 koronapay.com
 koshelek.app
+kp-config-smart-tv.akamaized.net
+kp-configs-smart-tv.s3.eu-central-1.amazonaws.com
 ktalk.host
 ktech.team
 lenta.com
